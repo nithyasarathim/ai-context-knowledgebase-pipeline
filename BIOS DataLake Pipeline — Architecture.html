@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BIOS DataLake Pipeline — Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12151a; --bg-panel:#181c23; --bg-panel-2:#1d222b;
+    --line:#2b313c; --line-soft:#232833;
+    --text:#e9e7e1; --text-dim:#9aa3b0; --text-faint:#5b6472;
+    --copper:#c1794d; --copper-dim:#7a5439;
+    --teal:#4fd1b3; --teal-dim:#2f6459;
+    --amber:#e8b04c;
+    padding-top: env(safe-area-inset-top,0px);
+    padding-bottom: env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);}
+  body{
+    font-family:'IBM Plex Sans',system-ui,sans-serif;
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:34px 34px;
+    background-attachment:fixed;
+    line-height:1.5;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .wrap{max-width:980px;margin:0 auto;padding:64px 24px 96px;}
+  a{color:var(--teal);}
+
+  /* ---- Hero ---- */
+  .hero{padding-bottom:48px;border-bottom:1px solid var(--line);margin-bottom:56px;}
+  .hero .kicker{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--text-faint);letter-spacing:.02em;margin-bottom:14px;}
+  .hero .kicker span{color:var(--teal);}
+  h1{font-size:clamp(28px,4.5vw,42px);line-height:1.15;margin:0 0 14px;font-weight:700;letter-spacing:-.01em;max-width:15ch;}
+  .hero p.lede{color:var(--text-dim);font-size:17px;max-width:58ch;margin:0 0 40px;}
+
+  .stat-row{display:flex;align-items:center;gap:28px;flex-wrap:wrap;}
+  .stat-block{display:flex;align-items:baseline;gap:16px;}
+  .stat-num{font-size:clamp(34px,6vw,56px);font-weight:700;font-family:'IBM Plex Mono',monospace;letter-spacing:-.02em;}
+  .stat-num.from{color:var(--copper);}
+  .stat-arrow{color:var(--text-faint);font-size:28px;}
+  .stat-num.to{color:var(--teal);}
+  .stat-label{color:var(--text-faint);font-size:13px;max-width:16ch;}
+
+  /* ---- Section shell ---- */
+  section{margin-bottom:64px;}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:24px;}
+  .sec-num{font-family:'IBM Plex Mono',monospace;color:var(--text-faint);font-size:13px;}
+  h2{font-size:21px;margin:0;font-weight:600;}
+  .sec-sub{color:var(--text-dim);font-size:15px;max-width:64ch;margin:-10px 0 26px 0;}
+
+  /* ---- Before / After flow diagrams ---- */
+  .flow{border:1px solid var(--line);background:var(--bg-panel);padding:28px;position:relative;}
+  .flow-tag{position:absolute;top:-11px;left:20px;background:var(--bg);padding:0 8px;font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .tag-before{color:var(--copper);}
+  .tag-after{color:var(--teal);}
+
+  .before-row{display:flex;align-items:center;gap:0;flex-wrap:wrap;}
+  .agent-box{border:1px solid var(--text-faint);padding:14px 18px;font-size:14px;font-weight:600;white-space:nowrap;}
+  .fan{display:flex;flex-direction:column;gap:10px;margin-left:22px;position:relative;padding-left:22px;}
+  .fan::before{content:"";position:absolute;left:0;top:8px;bottom:8px;border-left:1px dashed var(--copper-dim);}
+  .fan-line{display:flex;align-items:center;gap:10px;}
+  .fan-line::before{content:"";width:16px;height:1px;border-top:1px dashed var(--copper-dim);}
+  .mcp-box{border:1px dashed var(--copper-dim);color:var(--text-dim);padding:8px 14px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+  .before-note{margin-top:20px;color:var(--copper);font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+
+  .after-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .after-row .step{border:1px solid var(--teal-dim);padding:10px 16px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--text);white-space:nowrap;}
+  .after-row .arrow{color:var(--teal);font-size:15px;}
+  .after-note{margin-top:20px;color:var(--teal);font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+
+  /* ---- Mapping graph ---- */
+  .mapping{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .map-card{border:1px solid var(--line);background:var(--bg-panel);padding:20px;}
+  .map-card .rel{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--amber);margin-bottom:10px;}
+  .map-card .nodes{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .node{border:1px solid var(--text-faint);border-radius:50%;width:64px;height:64px;display:flex;align-items:center;justify-content:center;font-size:11px;text-align:center;font-family:'IBM Plex Mono',monospace;padding:4px;color:var(--text-dim);}
+  .node.hi{border-color:var(--teal);color:var(--text);}
+  .map-link{flex:1;height:1px;background:var(--line);position:relative;margin:0 6px;}
+  .map-link::after{content:"→";position:absolute;right:-4px;top:-9px;color:var(--text-faint);font-size:13px;}
+  .map-card p{font-size:13.5px;color:var(--text-dim);margin:0;}
+  .map-card code{color:var(--amber);}
+
+  /* ---- Storage layer ---- */
+  .storage{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .store{border:1px solid var(--line);background:var(--bg-panel);padding:22px;}
+  .store .store-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+  .store h3{margin:0;font-size:15px;font-weight:600;}
+  .store .store-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-faint);}
+  .store p{font-size:13.5px;color:var(--text-dim);margin:0;}
+  .store .store-bar{height:3px;width:36px;margin-bottom:14px;}
+  .store.pg .store-bar{background:#5c8dd6;}
+  .store.neo .store-bar{background:#6fce9c;}
+  .store.minio .store-bar{background:var(--amber);}
+
+  /* ---- Impact strip ---- */
+  .impact{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);}
+  .impact div{padding:22px 18px;border-right:1px solid var(--line);}
+  .impact div:last-child{border-right:none;}
+  .impact .n{font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--teal);font-weight:600;}
+  .impact .l{font-size:12.5px;color:var(--text-faint);margin-top:4px;}
+
+  footer{color:var(--text-faint);font-size:12.5px;font-family:'IBM Plex Mono',monospace;padding-top:24px;border-top:1px solid var(--line);}
+
+  /* ---- Full architecture diagram ---- */
+  .arch{border:1px solid var(--line);background:var(--bg-panel);padding:20px 8px;overflow-x:auto;}
+  .arch svg{display:block;width:100%;min-width:640px;height:auto;}
+  .arch text{font-family:'IBM Plex Mono',monospace;}
+  .arch .t-title{font-size:14px;font-weight:600;fill:var(--text);}
+  .arch .t-sub{font-size:10px;fill:var(--text-dim);}
+  .arch .t-edge{font-size:10px;fill:var(--text-faint);}
+  .n-box{fill:var(--bg-panel-2);stroke-width:1.5;}
+  .n-source .n-box{stroke:var(--text-faint);}
+  .n-map .n-box{stroke:var(--amber);}
+  .n-pg .n-box{stroke:#5c8dd6;}
+  .n-neo .n-box{stroke:#6fce9c;}
+  .n-minio .n-box{stroke:var(--amber);}
+  .n-mcp .n-box{stroke:var(--teal);stroke-width:2;}
+  .n-agent .n-box{stroke:var(--teal);stroke-width:2;}
+  .arch-legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:16px;font-size:12px;color:var(--text-faint);}
+  .arch-legend span{display:inline-flex;align-items:center;gap:7px;}
+  .arch-legend i{width:14px;height:2px;display:inline-block;}
+
+  @media (max-width:720px){
+    .mapping,.storage{grid-template-columns:1fr;}
+    .impact{grid-template-columns:1fr 1fr;}
+    .impact div{border-bottom:1px solid var(--line);}
+    .before-row{flex-direction:column;align-items:flex-start;}
+    .fan{margin-left:0;margin-top:16px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="kicker">DELL TECHNOLOGIES <span>/</span> BIOS ENGINEERING <span>/</span> INTERNAL PLATFORM</div>
+    <h1>A single source of truth knowledge base for AI agents working on BIOS firmware</h1>
+    <p class="lede">Feature knowledge for the BIOS codebase lives scattered across Jira, GitHub commits, and the source tree. This pipeline maps how that data relates, loads it into purpose-built stores, and lets an agent retrieve everything relevant to a feature in one deterministic call.</p>
+    <div class="stat-row">
+      <div class="stat-block">
+        <span class="stat-num from">15s</span>
+        <span class="stat-arrow">→</span>
+        <span class="stat-num to">20ms</span>
+      </div>
+      <span class="stat-label">time for an AI agent to retrieve full context for one feature</span>
+    </div>
+  </div>
+
+  <section>
+    <div class="sec-head"><div class="kicker" style="margin-bottom:0;">SYSTEM OVERVIEW</div></div>
+    <p class="sec-sub" style="margin-top:6px;">Every stage of the pipeline in one view — from raw sources, through mapping, into storage, out through a single MCP call.</p>
+    <div class="arch">
+      <svg viewBox="0 0 1000 590" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="aFaint" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#5b6472"/></marker>
+          <marker id="aTeal" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4fd1b3"/></marker>
+        </defs>
+
+        <!-- edges: sources -> mapping engine -->
+        <path d="M130,74 C130,110 300,130 495,130" fill="none" stroke="#5b6472" stroke-width="1.4" marker-end="url(#aFaint)"/>
+        <path d="M500,74 L500,128" fill="none" stroke="#5b6472" stroke-width="1.4" marker-end="url(#aFaint)"/>
+        <path d="M870,74 C870,110 700,130 505,130" fill="none" stroke="#5b6472" stroke-width="1.4" marker-end="url(#aFaint)"/>
+
+        <!-- edges: mapping engine -> stores -->
+        <path d="M500,194 C500,222 300,232 195,248" fill="none" stroke="#5b6472" stroke-width="1.4" marker-end="url(#aFaint)"/>
+        <path d="M500,194 L500,248" fill="none" stroke="#5b6472" stroke-width="1.4" marker-end="url(#aFaint)"/>
+        <path d="M500,194 C500,222 700,232 805,248" fill="none" stroke="#5b6472" stroke-width="1.4" marker-end="url(#aFaint)"/>
+
+        <!-- edges: stores -> MCP (the fast, deterministic path) -->
+        <path d="M190,310 C190,348 350,368 495,378" fill="none" stroke="#4fd1b3" stroke-width="1.6" marker-end="url(#aTeal)"/>
+        <path d="M500,310 L500,378" fill="none" stroke="#4fd1b3" stroke-width="1.6" marker-end="url(#aTeal)"/>
+        <path d="M810,310 C810,348 650,368 505,378" fill="none" stroke="#4fd1b3" stroke-width="1.6" marker-end="url(#aTeal)"/>
+
+        <!-- edge: MCP <-> Agent -->
+        <path d="M500,444 L500,498" fill="none" stroke="#4fd1b3" stroke-width="2" marker-end="url(#aTeal)" marker-start="url(#aTeal)"/>
+        <text x="518" y="475" class="t-edge">1 query ⇄ full context</text>
+
+        <!-- sources -->
+        <g class="n-source"><rect class="n-box" x="40" y="20" width="180" height="54" rx="8"/><text x="130" y="42" text-anchor="middle" class="t-title">Jira</text><text x="130" y="60" text-anchor="middle" class="t-sub">feature tickets</text></g>
+        <g class="n-source"><rect class="n-box" x="410" y="20" width="180" height="54" rx="8"/><text x="500" y="42" text-anchor="middle" class="t-title">GitHub</text><text x="500" y="60" text-anchor="middle" class="t-sub">commits + diffs</text></g>
+        <g class="n-source"><rect class="n-box" x="780" y="20" width="180" height="54" rx="8"/><text x="870" y="42" text-anchor="middle" class="t-title">Codebase</text><text x="870" y="60" text-anchor="middle" class="t-sub">BIOS source tree</text></g>
+
+        <!-- mapping engine -->
+        <g class="n-map"><rect class="n-box" x="360" y="130" width="280" height="64" rx="8"/><text x="500" y="155" text-anchor="middle" class="t-title">Mapping Engine</text><text x="500" y="174" text-anchor="middle" class="t-sub">regex + language parsers (31 dep. types)</text></g>
+
+        <!-- stores -->
+        <g class="n-pg"><rect class="n-box" x="90" y="250" width="200" height="60" rx="8"/><text x="190" y="275" text-anchor="middle" class="t-title">PostgreSQL</text><text x="190" y="293" text-anchor="middle" class="t-sub">tickets · commits · files</text></g>
+        <g class="n-neo"><rect class="n-box" x="400" y="250" width="200" height="60" rx="8"/><text x="500" y="275" text-anchor="middle" class="t-title">Neo4j</text><text x="500" y="293" text-anchor="middle" class="t-sub">file ↔ file graph</text></g>
+        <g class="n-minio"><rect class="n-box" x="710" y="250" width="200" height="60" rx="8"/><text x="810" y="275" text-anchor="middle" class="t-title">MinIO</text><text x="810" y="293" text-anchor="middle" class="t-sub">raw source files</text></g>
+
+        <!-- MCP -->
+        <g class="n-mcp"><rect class="n-box" x="380" y="380" width="240" height="64" rx="8"/><text x="500" y="405" text-anchor="middle" class="t-title">Single MCP Server</text><text x="500" y="424" text-anchor="middle" class="t-sub">query → 1 row → assembled context</text></g>
+
+        <!-- Agent -->
+        <g class="n-agent"><rect class="n-box" x="400" y="500" width="200" height="64" rx="8"/><text x="500" y="527" text-anchor="middle" class="t-title">AI Agent</text><text x="500" y="546" text-anchor="middle" class="t-sub">editing a BIOS feature</text></g>
+      </svg>
+      <div class="arch-legend">
+        <span><i style="background:#5b6472"></i>ingestion &amp; mapping</span>
+        <span><i style="background:#4fd1b3"></i>deterministic retrieval (~20ms)</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>The problem: context scattered across sources</h2></div>
+    <p class="sec-sub">Before this pipeline, an agent had no map of how a ticket, a commit, and a file related to each other — so it asked every source and stitched the answer together itself.</p>
+    <div class="flow">
+      <span class="flow-tag tag-before">BEFORE — fan-out per query</span>
+      <div class="before-row">
+        <div class="agent-box">AI Agent</div>
+        <div class="fan">
+          <div class="fan-line"><div class="mcp-box">Jira MCP</div></div>
+          <div class="fan-line"><div class="mcp-box">GitHub MCP</div></div>
+          <div class="fan-line"><div class="mcp-box">Codebase MCP</div></div>
+        </div>
+      </div>
+      <div class="before-note">~15s round trip · oversized, unrelated context pulled into the prompt · no notion of file dependencies</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>How the relationships are mapped</h2></div>
+    <p class="sec-sub">Three mappings turn disconnected records into one graph: ticket ↔ commit, commit ↔ files, and file ↔ file.</p>
+    <div class="mapping">
+      <div class="map-card">
+        <div class="rel">TICKET ↔ COMMIT</div>
+        <div class="nodes">
+          <div class="node">Ticket</div>
+          <div class="map-link"></div>
+          <div class="node hi">Commit</div>
+        </div>
+        <p>Commit message parsed with <code>regex</code> to extract the ticket ID it resolves.</p>
+      </div>
+      <div class="map-card">
+        <div class="rel">COMMIT ↔ FILES</div>
+        <div class="nodes">
+          <div class="node hi">Commit</div>
+          <div class="map-link"></div>
+          <div class="node">Files</div>
+        </div>
+        <p>Changed-file list per commit, stored as a foreign-key relation to commit and ticket.</p>
+      </div>
+      <div class="map-card">
+        <div class="rel">FILE ↔ FILE</div>
+        <div class="nodes">
+          <div class="node">File A</div>
+          <div class="map-link"></div>
+          <div class="node hi">File B</div>
+        </div>
+        <p>Language parsers resolve imports, function calls, variable and reference links — <code>31</code> dependency types.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>Where each relationship lands</h2></div>
+    <p class="sec-sub">Each mapping is stored in the data store best suited to how it will be queried.</p>
+    <div class="storage">
+      <div class="store pg">
+        <div class="store-bar"></div>
+        <div class="store-head"><h3>PostgreSQL</h3><span class="store-tag mono">relational</span></div>
+        <p>Tickets, commits and files as tables linked by foreign keys — the backbone lookup for "what resolved this, and what changed."</p>
+      </div>
+      <div class="store neo">
+        <div class="store-bar"></div>
+        <div class="store-head"><h3>Neo4j</h3><span class="store-tag mono">graph</span></div>
+        <p>File-to-file dependency edges from the language parsers — traversed to find every file a change actually touches.</p>
+      </div>
+      <div class="store minio">
+        <div class="store-bar"></div>
+        <div class="store-head"><h3>MinIO</h3><span class="store-tag mono">object storage</span></div>
+        <p>Raw source files held as the source of truth, referenced by row and node IDs rather than duplicated.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>The result: one MCP, one deterministic query</h2></div>
+    <p class="sec-sub">The agent no longer fans out. It calls a single MCP, which turns the request into a query, finds the matching row, and walks the mapped relationships to assemble exactly the relevant context.</p>
+    <div class="flow">
+      <span class="flow-tag tag-after">AFTER — single MCP, deterministic</span>
+      <div class="after-row">
+        <div class="step">AI Agent</div><span class="arrow">→</span>
+        <div class="step">Single MCP</div><span class="arrow">→</span>
+        <div class="step">Query → 1 row</div><span class="arrow">→</span>
+        <div class="step">Walk PG + Neo4j</div><span class="arrow">→</span>
+        <div class="step">Full feature context</div>
+      </div>
+      <div class="after-note">~20ms · dependent files included automatically · no irrelevant context in the prompt</div>
+    </div>
+  </section>
+
+  <section style="margin-bottom:0;">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Impact</h2></div>
+    <div class="impact">
+      <div><div class="n">750×</div><div class="l">faster context retrieval</div></div>
+      <div><div class="n">31</div><div class="l">code dependency types tracked</div></div>
+      <div><div class="n">1</div><div class="l">MCP call per query</div></div>
+      <div><div class="n">3</div><div class="l">sources unified: Jira, GitHub, codebase</div></div>
+    </div>
+  </section>
+
+  <footer>BIOS DataLake Pipeline — Dell Technologies internal platform</footer>
+</div>
+</body>
+</html>
